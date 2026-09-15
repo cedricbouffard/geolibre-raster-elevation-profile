@@ -1,0 +1,21 @@
+.raster-profile-panel {
+  box-sizing: border-box;
+  height: 100%;
+  overflow: auto;
+  padding: 12px;
+  color: var(--foreground, #1f2937);
+  background: var(--background, #ffffff);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.raster-profile-section { margin: 0 0 12px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; }
+.raster-profile-label { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 600; }
+.raster-profile-input, .raster-profile-select { width: 100%; box-sizing: border-box; padding: 6px; margin-bottom: 8px; }
+.raster-profile-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+.raster-profile-button { padding: 6px 10px; border: 1px solid #9ca3af; border-radius: 5px; background: #f3f4f6; cursor: pointer; }
+.raster-profile-button.primary { color: white; background: #2563eb; border-color: #2563eb; }
+.raster-profile-status { margin-top: 8px; font-size: 12px; }
+.raster-profile-chart { width: 100%; min-height: 180px; margin-top: 10px; }
+.raster-profile-chart svg { display: block; width: 100%; height: 180px; }
+.raster-profile-line { fill: none; stroke: #2563eb; stroke-width: 2; }
+.raster-profile-area { fill: rgba(37, 99, 235, 0.12); }
+.raster-profile-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 12px; }
