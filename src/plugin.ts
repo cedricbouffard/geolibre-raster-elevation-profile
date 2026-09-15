@@ -4,6 +4,7 @@ import "./styles.css";
 
 const PANEL_ID = "geolibre-raster-elevation-profile-panel";
 type Precision = "unit" | "decimal1" | "decimal2";
+type ProfilePoint = { distance: number; elevation: number; coord: [number, number] };
 
 let disposePanel: (() => void) | null = null;
 let manager: ProfileManager | null = null;
@@ -11,7 +12,7 @@ let manager: ProfileManager | null = null;
 class ProfileManager {
   private map: any;
   private line: [number, number][] = [];
-  private profile: { distance: number; elevation: number }[] = [];
+  private profile: ProfilePoint[] = [];
   private app: AppAPI;
 
   constructor(app: AppAPI) { this.app = app; }
@@ -20,6 +21,19 @@ class ProfileManager {
   addPoint(point: [number, number]): void { this.line.push(point); this.drawLine(); }
   clear(): void { this.line = []; this.profile = []; this.removeLine(); }
   getLine(): [number, number][] { return [...this.line]; }
+
+  setHoverPoint(coord: [number, number] | null): void {
+    if (!this.map) return;
+    const data: FeatureCollection = coord
+      ? { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coord } }] }
+      : { type: "FeatureCollection", features: [] };
+    const source = this.map.getSource?.("raster-profile-hover-point") as { setData(data: FeatureCollection): void } | undefined;
+    if (source) source.setData(data);
+    else {
+      this.map.addSource("raster-profile-hover-point", { type: "geojson", data });
+      this.map.addLayer({ id: "raster-profile-hover-point", type: "circle", source: "raster-profile-hover-point", paint: { "circle-radius": 6, "circle-color": "#ef4444", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } });
+    }
+  }
 
   async generate(layerId: string, interval: number, precision: Precision): Promise<void> {
     if (!this.app.readRasterWindow) throw new Error("This GeoLibre build does not expose readRasterWindow().");
@@ -50,6 +64,8 @@ class ProfileManager {
     if (!this.map) return;
     if (this.map.getLayer?.("raster-profile-line")) this.map.removeLayer("raster-profile-line");
     if (this.map.getSource?.("raster-profile-line")) this.map.removeSource("raster-profile-line");
+    if (this.map.getLayer?.("raster-profile-hover-point")) this.map.removeLayer("raster-profile-hover-point");
+    if (this.map.getSource?.("raster-profile-hover-point")) this.map.removeSource("raster-profile-hover-point");
   }
 
   private renderChart(interval: number, precision: Precision): void {
@@ -88,9 +104,10 @@ class ProfileManager {
       hoverLine.setAttribute("x2", String(points[index][0]));
       hoverDot.setAttribute("cx", String(points[index][0]));
       hoverDot.setAttribute("cy", String(y));
+      if (point) this.setHoverPoint(point.coord);
       if (hover && point) hover.textContent = `${format(point.distance, "decimal1")} m · ${format(point.elevation, precision)} m`;
     });
-    svg?.addEventListener("mouseleave", () => { if (hover) hover.textContent = ""; });
+    svg?.addEventListener("mouseleave", () => { this.setHoverPoint(null); if (hover) hover.textContent = ""; });
     const stats = document.querySelector<HTMLElement>("[data-raster-profile-stats]");
     if (stats) stats.textContent = `Min ${format(min, precision)} m · Max ${format(max, precision)} m · Δ ${format(max - min, precision)} m · Interval ${interval} m`;
   }
@@ -100,11 +117,11 @@ function extent(line: [number, number][]): [number, number, number, number] {
   return [Math.min(...line.map(([lng]) => lng)), Math.min(...line.map(([, lat]) => lat)), Math.max(...line.map(([lng]) => lng)), Math.max(...line.map(([, lat]) => lat))];
 }
 
-function sampleProfile(line: [number, number][], bounds: [number, number, number, number], reading: RasterWindowReading): { distance: number; elevation: number }[] {
+function sampleProfile(line: [number, number][], bounds: [number, number, number, number], reading: RasterWindowReading): ProfilePoint[] {
   const distances = cumulativeDistances(line);
   const total = distances.at(-1) ?? 0;
   const samples = Math.max(64, Math.min(256, reading.width));
-  const profile: { distance: number; elevation: number }[] = [];
+  const profile: ProfilePoint[] = [];
   let segment = 1;
   for (let sample = 0; sample < samples; sample += 1) {
     const distance = (total * sample) / (samples - 1);
@@ -119,7 +136,7 @@ function sampleProfile(line: [number, number][], bounds: [number, number, number
     const x = Math.max(0, Math.min(reading.width - 1, ((point[0] - bounds[0]) / (bounds[2] - bounds[0])) * reading.width));
     const y = Math.max(0, Math.min(reading.height - 1, ((bounds[3] - point[1]) / (bounds[3] - bounds[1])) * reading.height));
     const value = reading.values[Math.floor(y) * reading.width + Math.floor(x)];
-    if (Number.isFinite(value)) profile.push({ distance, elevation: value });
+    if (Number.isFinite(value)) profile.push({ distance, elevation: value, coord: point });
   }
   return profile;
 }

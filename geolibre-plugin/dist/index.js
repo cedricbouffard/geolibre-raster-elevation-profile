@@ -27,6 +27,17 @@ class ProfileManager {
   getLine() {
     return [...this.line];
   }
+  setHoverPoint(coord) {
+    var _a, _b;
+    if (!this.map) return;
+    const data = coord ? { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: coord } }] } : { type: "FeatureCollection", features: [] };
+    const source = (_b = (_a = this.map).getSource) == null ? void 0 : _b.call(_a, "raster-profile-hover-point");
+    if (source) source.setData(data);
+    else {
+      this.map.addSource("raster-profile-hover-point", { type: "geojson", data });
+      this.map.addLayer({ id: "raster-profile-hover-point", type: "circle", source: "raster-profile-hover-point", paint: { "circle-radius": 6, "circle-color": "#ef4444", "circle-stroke-color": "#ffffff", "circle-stroke-width": 2 } });
+    }
+  }
   async generate(layerId, interval, precision) {
     if (!this.app.readRasterWindow) throw new Error("This GeoLibre build does not expose readRasterWindow().");
     if (this.line.length < 2) throw new Error("Draw at least two points first.");
@@ -52,10 +63,12 @@ class ProfileManager {
     }
   }
   removeLine() {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     if (!this.map) return;
     if ((_b = (_a = this.map).getLayer) == null ? void 0 : _b.call(_a, "raster-profile-line")) this.map.removeLayer("raster-profile-line");
     if ((_d = (_c = this.map).getSource) == null ? void 0 : _d.call(_c, "raster-profile-line")) this.map.removeSource("raster-profile-line");
+    if ((_f = (_e = this.map).getLayer) == null ? void 0 : _f.call(_e, "raster-profile-hover-point")) this.map.removeLayer("raster-profile-hover-point");
+    if ((_h = (_g = this.map).getSource) == null ? void 0 : _h.call(_g, "raster-profile-hover-point")) this.map.removeSource("raster-profile-hover-point");
   }
   renderChart(interval, precision) {
     var _a;
@@ -94,9 +107,11 @@ class ProfileManager {
       hoverLine.setAttribute("x2", String(points[index][0]));
       hoverDot.setAttribute("cx", String(points[index][0]));
       hoverDot.setAttribute("cy", String(y));
+      if (point) this.setHoverPoint(point.coord);
       if (hover && point) hover.textContent = `${format(point.distance, "decimal1")} m · ${format(point.elevation, precision)} m`;
     });
     svg == null ? void 0 : svg.addEventListener("mouseleave", () => {
+      this.setHoverPoint(null);
       if (hover) hover.textContent = "";
     });
     const stats = document.querySelector("[data-raster-profile-stats]");
@@ -125,7 +140,7 @@ function sampleProfile(line, bounds, reading) {
     const x = Math.max(0, Math.min(reading.width - 1, (point[0] - bounds[0]) / (bounds[2] - bounds[0]) * reading.width));
     const y = Math.max(0, Math.min(reading.height - 1, (bounds[3] - point[1]) / (bounds[3] - bounds[1]) * reading.height));
     const value = reading.values[Math.floor(y) * reading.width + Math.floor(x)];
-    if (Number.isFinite(value)) profile.push({ distance, elevation: value });
+    if (Number.isFinite(value)) profile.push({ distance, elevation: value, coord: point });
   }
   return profile;
 }
