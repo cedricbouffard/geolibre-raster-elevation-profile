@@ -1,6 +1,6 @@
 {
   "name": "geolibre-raster-elevation-profile",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "GeoLibre plugin for elevation profiles from loaded COG rasters.",
   "type": "module",
   "scripts": {

@@ -42,7 +42,7 @@ class ProfileManager {
     if (!this.app.readRasterWindow) throw new Error("This GeoLibre build does not expose readRasterWindow().");
     if (this.line.length < 2) throw new Error("Draw at least two points first.");
     const bounds = extent(this.line);
-    const reading = await this.app.readRasterWindow(layerId, { bounds, width: 256, height: 256, band: 1 });
+    const reading = await this.app.readRasterWindow(layerId, { bounds, width: 128, height: 128, band: 1 });
     if (!reading) throw new Error("The selected raster could not be read.");
     this.profile = sampleProfile(this.line, bounds, reading);
     if (this.profile.length < 2) throw new Error("No valid raster values intersect the line.");
@@ -133,7 +133,7 @@ function extent(line) {
 function sampleProfile(line, bounds, reading) {
   const distances = cumulativeDistances(line);
   const total = distances.at(-1) ?? 0;
-  const samples = Math.max(64, Math.min(256, reading.width));
+  const samples = Math.max(64, Math.min(128, reading.width));
   const profile = [];
   let segment = 1;
   for (let sample = 0; sample < samples; sample += 1) {
@@ -187,7 +187,7 @@ function linearTrend(points) {
 const plugin = {
   id: "geolibre-raster-elevation-profile",
   name: "Raster Elevation Profile",
-  version: "0.1.0",
+  version: "0.1.1",
   engines: ["maplibre"],
   activate(app) {
     var _a, _b;

@@ -1,7 +1,7 @@
 {
   "id": "geolibre-raster-elevation-profile",
   "name": "Raster Elevation Profile",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "entry": "dist/index.js",
   "description": "Create elevation profiles from loaded GeoLibre COG rasters.",
   "style": "dist/style.css"
