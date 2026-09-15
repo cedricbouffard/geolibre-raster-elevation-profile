@@ -72,7 +72,27 @@ class ProfileManager {
       height - (point.elevation - min) / span * (height - 20) - 10
     ]);
     const path = points.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
-    host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><path class="raster-profile-area" d="${path} L ${width} ${height} L 0 ${height} Z"/><path class="raster-profile-line" d="${path}"/></svg>`;
+    host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><path class="raster-profile-area" d="${path} L ${width} ${height} L 0 ${height} Z"/><path class="raster-profile-line" d="${path}"/><line class="raster-profile-hover-line" data-profile-hover-line x1="0" x2="0" y1="0" y2="${height}"/><circle class="raster-profile-hover-dot" data-profile-hover-dot r="4" cx="0" cy="0"/></svg>`;
+    const svg = host.querySelector("svg");
+    const hoverLine = host.querySelector("[data-profile-hover-line]");
+    const hoverDot = host.querySelector("[data-profile-hover-dot]");
+    const hover = document.querySelector("[data-raster-profile-hover]");
+    svg == null ? void 0 : svg.addEventListener("mousemove", (event) => {
+      if (!svg || !hoverLine || !hoverDot) return;
+      const rect = svg.getBoundingClientRect();
+      const x = Math.max(0, Math.min(width, (event.clientX - rect.left) / rect.width * width));
+      const index = Math.round(x / width * (this.profile.length - 1));
+      const point = this.profile[index];
+      const y = points[index][1];
+      hoverLine.setAttribute("x1", String(points[index][0]));
+      hoverLine.setAttribute("x2", String(points[index][0]));
+      hoverDot.setAttribute("cx", String(points[index][0]));
+      hoverDot.setAttribute("cy", String(y));
+      if (hover && point) hover.textContent = `${format(point.distance, "decimal1")} m · ${format(point.elevation, precision)} m`;
+    });
+    svg == null ? void 0 : svg.addEventListener("mouseleave", () => {
+      if (hover) hover.textContent = "";
+    });
     const stats = document.querySelector("[data-raster-profile-stats]");
     if (stats) stats.textContent = `Min ${format(min, precision)} m · Max ${format(max, precision)} m · Δ ${format(max - min, precision)} m · Interval ${interval} m`;
   }
@@ -82,12 +102,26 @@ function extent(line) {
 }
 function sampleProfile(line, bounds, reading) {
   const distances = cumulativeDistances(line);
-  return line.flatMap((point, index) => {
+  const total = distances.at(-1) ?? 0;
+  const samples = Math.max(64, Math.min(256, reading.width));
+  const profile = [];
+  let segment = 1;
+  for (let sample = 0; sample < samples; sample += 1) {
+    const distance = total * sample / (samples - 1);
+    while (segment < distances.length - 1 && distances[segment] < distance) segment += 1;
+    const startDistance = distances[segment - 1];
+    const endDistance = distances[segment];
+    const ratio = endDistance === startDistance ? 0 : (distance - startDistance) / (endDistance - startDistance);
+    const point = [
+      line[segment - 1][0] + (line[segment][0] - line[segment - 1][0]) * ratio,
+      line[segment - 1][1] + (line[segment][1] - line[segment - 1][1]) * ratio
+    ];
     const x = Math.max(0, Math.min(reading.width - 1, (point[0] - bounds[0]) / (bounds[2] - bounds[0]) * reading.width));
     const y = Math.max(0, Math.min(reading.height - 1, (bounds[3] - point[1]) / (bounds[3] - bounds[1]) * reading.height));
     const value = reading.values[Math.floor(y) * reading.width + Math.floor(x)];
-    return Number.isFinite(value) ? [{ distance: distances[index], elevation: value }] : [];
-  });
+    if (Number.isFinite(value)) profile.push({ distance, elevation: value });
+  }
+  return profile;
 }
 function cumulativeDistances(line) {
   const values = [0];
@@ -120,7 +154,7 @@ const plugin = {
       render(container) {
         var _a2, _b2, _c, _d, _e, _f, _g;
         manager == null ? void 0 : manager.setMap((_a2 = app.getMap) == null ? void 0 : _a2.call(app));
-        container.innerHTML = `<div class="raster-profile-panel"><h3>Raster Elevation Profile</h3><div class="raster-profile-section"><label class="raster-profile-label">Raster layer</label><select class="raster-profile-select" data-raster-profile-layer></select><label class="raster-profile-label">Precision</label><select class="raster-profile-select" data-raster-profile-precision><option value="unit">0 decimals</option><option value="decimal1">1 decimal</option><option value="decimal2">2 decimals</option></select><div class="raster-profile-buttons"><button class="raster-profile-button primary" data-raster-profile-draw>Draw line</button><button class="raster-profile-button" data-raster-profile-finish>Apply profile</button><button class="raster-profile-button" data-raster-profile-clear>Clear</button></div><div class="raster-profile-status" data-raster-profile-status></div></div><div class="raster-profile-stats" data-raster-profile-stats></div><div class="raster-profile-chart" data-raster-profile-chart></div></div>`;
+        container.innerHTML = `<div class="raster-profile-panel"><h3>Raster Elevation Profile</h3><div class="raster-profile-section"><label class="raster-profile-label">Raster layer</label><select class="raster-profile-select" data-raster-profile-layer></select><label class="raster-profile-label">Precision</label><select class="raster-profile-select" data-raster-profile-precision><option value="unit">0 decimals</option><option value="decimal1">1 decimal</option><option value="decimal2">2 decimals</option></select><div class="raster-profile-buttons"><button class="raster-profile-button primary" data-raster-profile-draw>Draw line</button><button class="raster-profile-button" data-raster-profile-finish>Apply profile</button><button class="raster-profile-button" data-raster-profile-clear>Clear</button></div><div class="raster-profile-status" data-raster-profile-status></div></div><div class="raster-profile-stats" data-raster-profile-stats></div><div class="raster-profile-hover" data-raster-profile-hover></div><div class="raster-profile-chart" data-raster-profile-chart></div></div>`;
         const layerSelect = container.querySelector("[data-raster-profile-layer]");
         for (const layer of ((_b2 = app.listLayers) == null ? void 0 : _b2.call(app).filter((item) => /cog|raster/i.test(item.type))) ?? []) {
           const option = document.createElement("option");
