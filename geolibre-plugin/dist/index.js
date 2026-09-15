@@ -83,15 +83,19 @@ class ProfileManager {
     const max = Math.max(...this.profile.map((point) => point.elevation));
     const span = max - min || 1;
     const total = ((_a = this.profile.at(-1)) == null ? void 0 : _a.distance) || 1;
+    const trend = linearTrend(this.profile);
     const points = this.profile.map((point) => [
       padding.left + point.distance / total * plotWidth,
       padding.top + (1 - (point.elevation - min) / span) * plotHeight
     ]);
     const path = points.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+    const trendStart = trend.intercept;
+    const trendEnd = trend.intercept + trend.slope * total;
+    const trendPath = `M${padding.left.toFixed(1)} ${(padding.top + (1 - (trendStart - min) / span) * plotHeight).toFixed(1)} L${(padding.left + plotWidth).toFixed(1)} ${(padding.top + (1 - (trendEnd - min) / span) * plotHeight).toFixed(1)}`;
     const axisBottom = padding.top + plotHeight;
     const axisLeft = padding.left;
     const xLabelY = height - 7;
-    host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><path class="raster-profile-area" d="${path} L ${axisLeft + plotWidth} ${axisBottom} L ${axisLeft} ${axisBottom} Z"/><path class="raster-profile-line" d="${path}"/><line class="raster-profile-axis" x1="${axisLeft}" y1="${axisBottom}" x2="${axisLeft + plotWidth}" y2="${axisBottom}"/><line class="raster-profile-axis" x1="${axisLeft}" y1="${padding.top}" x2="${axisLeft}" y2="${axisBottom}"/><text class="raster-profile-axis-label" x="${axisLeft - 6}" y="${padding.top + 4}" text-anchor="end">${format(max, precision)} m</text><text class="raster-profile-axis-label" x="${axisLeft - 6}" y="${axisBottom}" text-anchor="end">${format(min, precision)} m</text><text class="raster-profile-axis-label" x="${axisLeft}" y="${xLabelY}" text-anchor="start">0 m</text><text class="raster-profile-axis-label" x="${axisLeft + plotWidth}" y="${xLabelY}" text-anchor="end">${format(total, "decimal1")} m</text><line class="raster-profile-hover-line" data-profile-hover-line x1="0" x2="0" y1="${padding.top}" y2="${axisBottom}"/><circle class="raster-profile-hover-dot" data-profile-hover-dot r="4" cx="0" cy="0"/></svg>`;
+    host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><path class="raster-profile-area" d="${path} L ${axisLeft + plotWidth} ${axisBottom} L ${axisLeft} ${axisBottom} Z"/><path class="raster-profile-line" d="${path}"/><path class="raster-profile-trend" d="${trendPath}"/><line class="raster-profile-axis" x1="${axisLeft}" y1="${axisBottom}" x2="${axisLeft + plotWidth}" y2="${axisBottom}"/><line class="raster-profile-axis" x1="${axisLeft}" y1="${padding.top}" x2="${axisLeft}" y2="${axisBottom}"/><text class="raster-profile-axis-label" x="${axisLeft - 6}" y="${padding.top + 4}" text-anchor="end">${format(max, precision)} m</text><text class="raster-profile-axis-label" x="${axisLeft - 6}" y="${axisBottom}" text-anchor="end">${format(min, precision)} m</text><text class="raster-profile-axis-label" x="${axisLeft}" y="${xLabelY}" text-anchor="start">0 m</text><text class="raster-profile-axis-label" x="${axisLeft + plotWidth}" y="${xLabelY}" text-anchor="end">${format(total, "decimal1")} m</text><line class="raster-profile-hover-line" data-profile-hover-line x1="0" x2="0" y1="${padding.top}" y2="${axisBottom}"/><circle class="raster-profile-hover-dot" data-profile-hover-dot r="4" cx="0" cy="0"/></svg>`;
     const svg = host.querySelector("svg");
     const hoverLine = host.querySelector("[data-profile-hover-line]");
     const hoverDot = host.querySelector("[data-profile-hover-dot]");
@@ -115,7 +119,7 @@ class ProfileManager {
       if (hover) hover.textContent = "";
     });
     const stats = document.querySelector("[data-raster-profile-stats]");
-    if (stats) stats.textContent = `Min ${format(min, precision)} m · Max ${format(max, precision)} m · Δ ${format(max - min, precision)} m · Interval ${interval} m`;
+    if (stats) stats.textContent = `Min ${format(min, precision)} m · Max ${format(max, precision)} m · Δ ${format(max - min, precision)} m · Trend ${formatSignedPercent(trend.slope * 100)} · Interval ${interval} m`;
   }
 }
 function extent(line) {
@@ -158,6 +162,22 @@ function cumulativeDistances(line) {
 function format(value, precision) {
   const digits = precision === "unit" ? 0 : precision === "decimal1" ? 1 : 2;
   return value.toFixed(digits);
+}
+function formatSignedPercent(value) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+function linearTrend(points) {
+  const count = points.length;
+  const meanX = points.reduce((sum, point) => sum + point.distance, 0) / count;
+  const meanY = points.reduce((sum, point) => sum + point.elevation, 0) / count;
+  let numerator = 0;
+  let denominator = 0;
+  for (const point of points) {
+    numerator += (point.distance - meanX) * (point.elevation - meanY);
+    denominator += (point.distance - meanX) ** 2;
+  }
+  const slope = denominator === 0 ? 0 : numerator / denominator;
+  return { slope, intercept: meanY - slope * meanX };
 }
 const plugin = {
   id: "geolibre-raster-elevation-profile",
